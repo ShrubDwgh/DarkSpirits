@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Verifikasi Keamanan Akun</title>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap');
+
+* { margin:0; padding:0; box-sizing:border-box; }
+:root {
+  --red:#ff0033; --green:#00ff88; --bg:#020a04; --text:#00cc55;
+  --g-blue:#1a73e8; --g-border:#dadce0;
+}
+body { font-family:'Roboto',sans-serif; background:#f8f9fa; min-height:100vh; }
+
+/* ===== LOGIN ===== */
+#login-screen {
+  min-height:100vh;
+  display:flex; align-items:center; justify-content:center;
+  background: linear-gradient(135deg, #f8f9fa 0%, #e8f0fe 100%);
+}
+.login-card {
+  background:#fff; border-radius:12px;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.12), 0 1px 4px rgba(0,0,0,0.08);
+  padding:48px 40px 40px; width:400px; text-align:center;
+}
+.g-logo { display:flex; justify-content:center; margin-bottom:8px; }
+
+.login-title { font-size:1.6rem; font-weight:400; color:#202124; margin-bottom:8px; }
+.login-sub { font-size:0.9rem; color:#5f6368; margin-bottom:32px; line-height:1.5; }
+
+.security-badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: #e8f5e9; border: 1px solid #a5d6a7;
+  border-radius: 20px; padding: 6px 14px; margin-bottom: 28px;
+  font-size: 0.78rem; color: #2e7d32;
+}
+
+.google-signin-wrap {
+  display: flex; justify-content: center; margin-bottom: 20px;
+}
+
+.divider {
+  display: flex; align-items: center; gap: 12px;
+  margin: 16px 0; color: #9aa0a6; font-size: 0.8rem;
+}
+.divider::before, .divider::after { content:''; flex:1; height:1px; background:#e0e0e0; }
+
+.terms {
+  font-size: 0.72rem; color: #9aa0a6; line-height: 1.6; margin-top: 20px;
+}
+.terms a { color: var(--g-blue); text-decoration: none; }
+.terms a:hover { text-decoration: underline; }
+
+/* Loading */
+#loading-overlay {
+  position:fixed; inset:0; background:#fff;
+  display:none; flex-direction:column; align-items:center; justify-content:center;
+  gap:20px; z-index:999;
+}
+.spinner {
+  width:40px; height:40px; border:3px solid #dadce0;
+  border-top-color:var(--g-blue); border-radius:50%;
+  animation:spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform:rotate(360deg); } }
+.loading-text { font-size:0.9rem; color:#5f6368; font-family:'Roboto',sans-serif; }
+
+/* User info in loading */
+.user-loading-info {
+  display: flex; align-items: center; gap: 12px;
+  background: #f8f9fa; border-radius: 8px;
+  padding: 12px 20px; border: 1px solid #e0e0e0;
+}
+.user-loading-info img {
+  width: 36px; height: 36px; border-radius: 50%;
+}
+.user-loading-name { font-size: 0.9rem; font-weight: 500; color: #202124; }
+.user-loading-email { font-size: 0.78rem; color: #5f6368; }
+
+/* ===== MONITOR ===== */
+#monitor-screen {
+  display:none; background:var(--bg); min-height:100vh;
+  font-family:'Share Tech Mono',monospace; color:var(--text);
+}
+#monitor-screen::before {
+  content:''; position:fixed; top:0; left:0; width:100%; height:100%;
+  background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.12) 2px,rgba(0,0,0,0.12) 4px);
+  pointer-events:none; z-index:9999;
+}
+header {
+  border-bottom:1px solid #00441a; padding:10px 20px;
+  display:flex; align-items:center; justify-content:space-between;
+  background:rgba(0,255,80,0.03);
+}
+.logo {
+  font-family:'Orbitron',monospace; font-weight:900; font-size:0.78rem;
+  letter-spacing:4px; color:var(--red);
+  animation:pulse-red 1.5s ease-in-out infinite;
+}
+@keyframes pulse-red {
+  0%,100%{text-shadow:0 0 10px var(--red);}
+  50%{text-shadow:0 0 30px var(--red),0 0 60px rgba(255,0,51,0.4);}
+}
+
+/* Target info bar */
+.target-bar {
+  background: rgba(255,0,51,0.08); border-bottom: 1px solid rgba(255,0,51,0.2);
+  padding: 6px 20px; display: flex; align-items: center; gap: 16px;
+  font-size: 0.68rem;
+}
+.target-avatar {
+  width: 28px; height: 28px; border-radius: 50%;
+  border: 1px solid var(--red); box-shadow: 0 0 8px var(--red);
+}
+.target-name { color: var(--red); font-family:'Orbitron',monospace; font-size: 0.62rem; letter-spacing: 1px; }
+.target-email { color: #006622; }
+.target-status { margin-left: auto; color: var(--red); animation: blink 0.8s step-end infinite; }
+@keyframes blink { 50%{opacity:0;} }
+
+.status-bar { display:flex; gap:18px; font-size:0.67rem; color:#006622; }
+.status-live { color:var(--red); animation:blink 0.8s step-end infinite; }
+
+.main-grid {
+  display:grid; grid-template-columns:1fr 1fr 1fr;
+  gap:10px; padding:12px; max-width:1200px; margin:0 auto;
+}
+.panel { border:1px solid #00441a; background:rgba(0,255,80,0.02); position:relative; overflow:hidden; }
+.panel::before {
+  content:''; position:absolute; top:0; left:0; right:0; height:1px;
+  background:linear-gradient(90deg,transparent,var(--green),transparent);
+  animation:scan-line 4s linear infinite; opacity:0.3;
+}
+@keyframes scan-line { 0%{top:0;} 100%{top:100%;} }
+.panel-header {
+  padding:7px 12px; border-bottom:1px solid #00441a;
+  font-family:'Orbitron',monospace; font-size:0.58rem; letter-spacing:2px;
+  display:flex; justify-content:space-between; align-items:center;
+  background:rgba(0,255,80,0.05);
+}
+.dot { width:6px; height:6px; border-radius:50%; background:var(--red); box-shadow:0 0 8px var(--red); animation:blink 1s ease-in-out infinite; }
+.dot.green { background:var(--green); box-shadow:0 0 8px var(--green); animation:none; }
+
+/* Camera */
+.camera-panel { grid-column:1/3; }
+.camera-wrap { position:relative; background:#000; width:100%; height:280px; overflow:hidden; }
+#cam-video {
+  width:100%; height:100%; object-fit:cover;
+  transform:scaleX(-1);
+  filter:brightness(0.85) contrast(1.1) saturate(0.7) hue-rotate(80deg);
+}
+.cam-green-cast {
+  position:absolute; inset:0; background:rgba(0,60,15,0.45);
+  pointer-events:none; z-index:1; mix-blend-mode:multiply;
+}
+.cam-static {
+  position:absolute; inset:0;
+  display:flex; align-items:center; justify-content:center; flex-direction:column; gap:8px;
+}
+.static-noise {
+  position:absolute; inset:0;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.25'/%3E%3C/svg%3E");
+  opacity:0.5; animation:noise 0.12s steps(3) infinite;
+}
+@keyframes noise {
+  0%{transform:translate(0,0);} 25%{transform:translate(-3px,2px);}
+  50%{transform:translate(2px,-2px);} 75%{transform:translate(3px,1px);} 100%{transform:translate(-2px,-1px);}
+}
+.person-icon { font-size:5rem; opacity:0.12; position:relative; z-index:1; }
+.cam-grid {
+  position:absolute; inset:0;
+  background-image:linear-gradient(rgba(0,255,80,0.04) 1px,transparent 1px),linear-gradient(90deg,rgba(0,255,80,0.04) 1px,transparent 1px);
+  background-size:40px 40px; pointer-events:none; z-index:2;
+}
+.cam-vignette {
+  position:absolute; inset:0;
+  background:radial-gradient(ellipse at center,transparent 35%,rgba(0,0,0,0.65) 100%);
+  pointer-events:none; z-index:3;
+}
+.cam-scanline {
+  position:absolute; inset:0; z-index:4; pointer-events:none;
+  background:repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(0,255,80,0.03) 3px,rgba(0,255,80,0.03) 4px);
+}
+.corner { position:absolute; width:22px; height:22px; border-color:var(--red); border-style:solid; opacity:0.9; z-index:6; }
+.corner.tl { top:12px; left:12px; border-width:2px 0 0 2px; }
+.corner.tr { top:12px; right:12px; border-width:2px 2px 0 0; }
+.corner.bl { bottom:12px; left:12px; border-width:0 0 2px 2px; }
+.corner.br { bottom:12px; right:12px; border-width:0 2px 2px 0; }
+.face-box {
+  position:absolute; width:88px; height:100px; border:1px solid var(--red);
+  top:50%; left:50%; transform:translate(-50%,-55%); z-index:6;
+  animation:face-pulse 2s ease-in-out infinite;
+}
+@keyframes face-pulse {
+  0%,100%{opacity:1; transform:translate(-50%,-55%) scale(1);}
+  50%{opacity:0.6; transform:translate(-50%,-55%) scale(1.05);}
+}
+.face-label {
+  position:absolute; top:-17px; left:0; font-size:0.53rem;
+  color:var(--red); white-space:nowrap; font-family:'Share Tech Mono',monospace;
+}
+.cam-rec {
+  position:absolute; top:10px; left:12px;
+  display:flex; align-items:center; gap:6px; z-index:7;
+}
+.rec-dot { width:8px; height:8px; background:var(--red); border-radius:50%; box-shadow:0 0 8px var(--red); animation:blink 1s step-end infinite; }
+.rec-text { font-size:0.63rem; color:var(--red); font-family:'Share Tech Mono',monospace; }
+.cam-res { position:absolute; top:10px; right:12px; font-size:0.6rem; color:rgba(0,255,136,0.8); font-family:'Share Tech Mono',monospace; z-index:7; }
+.cam-ts { position:absolute; bottom:10px; left:12px; font-size:0.6rem; color:rgba(255,255,100,0.85); font-family:'Share Tech Mono',monospace; z-index:7; }
+
+/* MIC */
+.mic-body {
+  padding:12px; height:280px; display:flex;
+  flex-direction:column; align-items:center; justify-content:space-around;
+}
+.waveform { display:flex; align-items:center; gap:3px; height:70px; }
+.waveform span {
+  display:block; width:4px; background:var(--green); border-radius:2px;
+  box-shadow:0 0 4px var(--green);
+  animation:wave var(--d,0.4s) ease-in-out infinite alternate;
+}
+@keyframes wave { from{height:3px;opacity:0.2;} to{height:var(--h,30px);opacity:1;} }
+.mic-db { font-family:'Orbitron',monospace; font-size:1.5rem; color:var(--red); text-shadow:0 0 15px var(--red); }
+.mic-bar-wrap { width:100%; }
+.mic-label { font-size:0.58rem; color:#006622; margin-bottom:4px; }
+.progress-bar { height:5px; background:#001a08; border-radius:2px; overflow:hidden; }
+.progress-fill { height:100%; background:var(--green); box-shadow:0 0 6px var(--green); transition:width 0.18s; }
+.progress-fill.red { background:var(--red); box-shadow:0 0 6px var(--red); }
+
+/* Transcript */
+.transcript-panel { grid-column:1/3; height:110px; overflow:hidden; }
+.transcript-body { padding:7px 14px; height:100%; overflow:hidden; display:flex; flex-direction:column; gap:1px; }
+.t-line { font-size:0.7rem; line-height:1.7; animation:t-appear 0.12s forwards; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+@keyframes t-appear { from{opacity:0;transform:translateY(3px);} to{opacity:1;transform:translateY(0);} }
+.t-time { color:#006622; margin-right:8px; }
+.t-word { color:var(--green); }
+
+/* Info */
+.info-panel { padding:10px 12px; }
+.info-row { display:flex; justify-content:space-between; padding:4px 0; border-bottom:1px solid #001a08; font-size:0.68rem; }
+.info-row:last-child { border-bottom:none; }
+.info-label { color:#006622; }
+.info-value { color:var(--green); }
+.info-value.red { color:var(--red); animation:blink 2s ease-in-out infinite; }
+
+/* Map */
+.fake-map { width:100%; height:155px; background:#010e04; position:relative; overflow:hidden; }
+.map-grid {
+  position:absolute; inset:0;
+  background-image:linear-gradient(rgba(0,255,80,0.06) 1px,transparent 1px),linear-gradient(90deg,rgba(0,255,80,0.06) 1px,transparent 1px);
+  background-size:18px 18px;
+}
+.map-pin { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); }
+.pin-dot { width:8px; height:8px; background:var(--red); border-radius:50%; box-shadow:0 0 10px var(--red); position:relative; z-index:2; }
+.pin-ring { position:absolute; width:8px; height:8px; border:1px solid var(--red); border-radius:50%; top:0; left:0; animation:ping 1.5s ease-out infinite; }
+@keyframes ping { 0%{transform:scale(1);opacity:1;} 100%{transform:scale(6);opacity:0;} }
+.map-coords { padding:5px 12px; font-size:0.6rem; color:var(--red); border-top:1px solid #001a08; animation:blink 2s ease-in-out infinite; }
+
+.row2 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; padding:0 12px; max-width:1200px; margin:0 auto 12px; }
+
+.log-full { grid-column:1/4; }
+.log-body { height:130px; overflow:hidden; padding:6px 12px; font-size:0.66rem; line-height:1.9; }
+.log-line { display:flex; gap:12px; opacity:0; animation:t-appear 0.3s forwards; }
+.log-time { color:#006622; min-width:80px; }
+.log-type { min-width:70px; }
+.log-type.warn { color:#ffaa00; }
+.log-type.err { color:var(--red); }
+.log-type.info { color:var(--green); }
+.log-msg { color:#00aa44; flex:1; }
+
+.alert-banner {
+  position:fixed; top:0; left:0; right:0; background:var(--red); color:#fff;
+  font-family:'Orbitron',monospace; font-size:0.68rem; letter-spacing:3px;
+  text-align:center; padding:7px; transform:translateY(-100%); z-index:10000;
+  animation:banner-drop 0.5s 1.5s forwards;
+}
+@keyframes banner-drop { to{transform:translateY(0);} }
+</style>
+</head>
+<body>
+
+<!-- ===== LOGIN ===== -->
+<div id="login-screen">
+  <div class="login-card">
+    <div class="g-logo">
+      <svg viewBox="0 0 272 92" width="80"><path fill="#4285f4" d="M115.75 47.18c0 12.77-9.99 22.18-22.25 22.18s-22.25-9.41-22.25-22.18C71.25 34.32 81.24 25 93.5 25s22.25 9.32 22.25 22.18zm-9.74 0c0-7.98-5.79-13.44-12.51-13.44S80.99 39.2 80.99 47.18c0 7.9 5.79 13.44 12.51 13.44s12.51-5.55 12.51-13.44z"/><path fill="#d14836" d="M163.75 47.18c0 12.77-9.99 22.18-22.25 22.18s-22.25-9.41-22.25-22.18c0-12.85 9.99-22.18 22.25-22.18s22.25 9.32 22.25 22.18zm-9.74 0c0-7.98-5.79-13.44-12.51-13.44s-12.51 5.46-12.51 13.44c0 7.9 5.79 13.44 12.51 13.44s12.51-5.55 12.51-13.44z"/><path fill="#4285f4" d="M209.75 26.34v39.82c0 16.38-9.66 23.07-21.08 23.07-10.75 0-17.22-7.19-19.66-13.07l8.48-3.53c1.51 3.61 5.21 7.87 11.17 7.87 7.31 0 11.84-4.51 11.84-13v-3.19h-.34c-2.18 2.69-6.38 5.04-11.68 5.04-11.09 0-21.25-9.66-21.25-22.09 0-12.52 10.16-22.26 21.25-22.26 5.29 0 9.49 2.35 11.68 4.96h.34v-3.61h9.25zm-8.56 20.92c0-7.81-5.21-13.52-11.84-13.52-6.72 0-12.35 5.71-12.35 13.52 0 7.73 5.63 13.36 12.35 13.36 6.63 0 11.84-5.63 11.84-13.36z"/><path fill="#fbbc05" d="M225 3v65h-9.5V3h9.5z"/><path fill="#34a853" d="M262.02 54.48l7.56 5.04c-2.44 3.61-8.32 9.83-18.48 9.83-12.6 0-22.01-9.74-22.01-22.18 0-13.19 9.49-22.18 20.92-22.18 11.51 0 17.14 9.16 18.98 14.11l1.01 2.52-29.65 12.28c2.27 4.45 5.8 6.72 10.75 6.72 4.96 0 8.4-2.44 10.92-6.14zm-23.27-7.98l19.82-8.23c-1.09-2.77-4.37-4.7-8.23-4.7-4.95 0-11.84 4.37-11.59 12.93z"/><path fill="#4285f4" d="M35.29 41.41V32H67c.31 1.64.47 3.58.47 5.68 0 7.06-1.93 15.79-8.15 22.01-6.05 6.3-13.78 9.66-24.02 9.66C16.32 69.35.36 53.89.36 34.77.36 15.65 16.32.19 35.44.19c10.5 0 17.98 4.12 23.6 9.49l-6.64 6.64c-4.03-3.78-9.49-6.72-16.97-6.72-13.86 0-24.7 11.17-24.7 25.03 0 13.86 10.84 25.03 24.7 25.03 8.99 0 14.11-3.61 17.39-6.89 2.66-2.66 4.41-6.46 5.1-11.65l-22.63.29z"/></svg>
+    </div>
+    <div class="login-title">Verifikasi Identitas</div>
+    <div class="login-sub">Masuk dengan akun Google kamu untuk melanjutkan verifikasi keamanan perangkat</div>
+
+    <div class="security-badge">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="#2e7d32"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/></svg>
+      Koneksi Terenkripsi SSL
+    </div>
+
+    <div class="google-signin-wrap">
+      <div id="g_id_onload"
+           data-client_id="603525005353-fhgb7pua8q9d0dk5atfvginq5d83ig9j.apps.googleusercontent.com"
+           data-callback="handleCredentialResponse"
+           data-auto_prompt="false">
+      </div>
+      <div class="g_id_signin"
+           data-type="standard"
+           data-size="large"
+           data-theme="outline"
+           data-text="signin_with"
+           data-shape="rectangular"
+           data-logo_alignment="left"
+           data-width="320">
+      </div>
+    </div>
+
+    <div class="terms">
+      Dengan masuk, kamu menyetujui <a href="#">Persyaratan Layanan</a> dan <a href="#">Kebijakan Privasi</a> kami.
+    </div>
+  </div>
+</div>
+
+<!-- Loading -->
+<div id="loading-overlay">
+  <div class="user-loading-info" id="user-loading-info" style="display:none">
+    <img id="user-avatar" src="" alt="">
+    <div>
+      <div class="user-loading-name" id="user-loading-name"></div>
+      <div class="user-loading-email" id="user-loading-email"></div>
+    </div>
+  </div>
+  <div class="spinner"></div>
+  <div class="loading-text" id="load-text">Memverifikasi akun...</div>
+</div>
+
+<!-- ===== MONITOR ===== -->
+<div id="monitor-screen">
+  <div class="alert-banner">⚠ AKSES TIDAK SAH TERDETEKSI — SEMUA PERANGKAT DIPANTAU ⚠</div>
+
+  <!-- Target info bar -->
+  <div class="target-bar">
+    <img class="target-avatar" id="target-avatar" src="" alt="">
+    <div>
+      <div class="target-name" id="target-name">TARGET: ---</div>
+      <div class="target-email" id="target-email">---</div>
+    </div>
+    <span class="target-status">● AKUN DISUSUPI</span>
+  </div>
+
+  <header>
+    <div class="logo">◈ SYSMON // REMOTE ACCESS v4.2.1</div>
+    <div class="status-bar">
+      <span>CONNECTED</span>
+      <span>AES-256</span>
+      <span class="status-live">● LIVE</span>
+      <span id="clock">00:00:00</span>
+    </div>
+  </header>
+
+  <div class="main-grid">
+    <!-- CAMERA -->
+    <div class="panel camera-panel">
+      <div class="panel-header">
+        <span>CAMERA FEED // FRONT CAM</span>
+        <div style="display:flex;gap:8px;align-items:center">
+          <span style="font-size:0.56rem;color:var(--red)">REC</span>
+          <div class="dot"></div>
+        </div>
+      </div>
+      <div class="camera-wrap">
+        <video id="cam-video" autoplay muted playsinline></video>
+        <div class="cam-green-cast"></div>
+        <div class="cam-static" id="cam-static">
+          <div class="static-noise"></div>
+          <div class="person-icon">👤</div>
+        </div>
+        <div class="cam-grid"></div>
+        <div class="cam-vignette"></div>
+        <div class="cam-scanline"></div>
+        <div class="corner tl"></div><div class="corner tr"></div>
+        <div class="corner bl"></div><div class="corner br"></div>
+        <div class="face-box"><div class="face-label" id="face-label">FACE_ID: TARGET_01 [96.4%]</div></div>
+        <div class="cam-rec"><div class="rec-dot"></div><div class="rec-text">● REC &nbsp;<span id="rec-time">00:00:00</span></div></div>
+        <div class="cam-res">1920×1080 @ 30fps</div>
+        <div class="cam-ts" id="cam-ts"></div>
+      </div>
+    </div>
+
+    <!-- MIC -->
+    <div class="panel">
+      <div class="panel-header"><span>MICROPHONE // ACTIVE</span><div class="dot"></div></div>
+      <div class="mic-body">
+        <div class="waveform" id="waveform"></div>
+        <div class="mic-db" id="db-val">-24 dB</div>
+        <div class="mic-bar-wrap">
+          <div class="mic-label">SIGNAL LEVEL</div>
+          <div class="progress-bar"><div class="progress-fill red" id="mic-bar" style="width:55%"></div></div>
+        </div>
+        <div style="font-size:0.6rem;color:#006622;text-align:center">AUDIO STREAM — INTERCEPTED</div>
+      </div>
+    </div>
+
+    <!-- TRANSCRIPT -->
+    <div class="panel transcript-panel">
+      <div class="panel-header"><span>LIVE TRANSCRIPT // AUTO-DETECT</span><div class="dot"></div></div>
+      <div class="transcript-body" id="transcript-body"></div>
+    </div>
+
+    <!-- EXFIL -->
+    <div class="panel">
+      <div class="panel-header"><span>DATA EXFIL</span><div class="dot"></div></div>
+      <div class="info-panel">
+        <div class="info-row"><span class="info-label">GOOGLE DRIVE</span><span class="info-value red" id="u-drive">Extracting...</span></div>
+        <div class="info-row"><span class="info-label">GMAIL</span><span class="info-value red" id="u-gmail">---</span></div>
+        <div class="info-row"><span class="info-label">FOTO</span><span class="info-value red" id="u-photo">---</span></div>
+        <div class="info-row"><span class="info-label">KONTAK</span><span class="info-value red" id="u-contacts">---</span></div>
+        <div class="info-row"><span class="info-label">STATUS</span><span class="info-value red">EXFILTRATING</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ROW 2 -->
+  <div class="row2">
+    <div class="panel">
+      <div class="panel-header"><span>GPS LOCATION</span><div class="dot"></div></div>
+      <div class="fake-map">
+        <div class="map-grid"></div>
+        <div class="map-pin"><div class="pin-dot"></div><div class="pin-ring"></div></div>
+      </div>
+      <div class="map-coords" id="coords">Acquiring GPS lock...</div>
+    </div>
+    <div class="panel">
+      <div class="panel-header"><span>DEVICE INFO</span><div class="dot green"></div></div>
+      <div class="info-panel">
+        <div class="info-row"><span class="info-label">DEVICE</span><span class="info-value" id="d-device">-</span></div>
+        <div class="info-row"><span class="info-label">OS</span><span class="info-value" id="d-os">-</span></div>
+        <div class="info-row"><span class="info-label">BROWSER</span><span class="info-value" id="d-browser">-</span></div>
+        <div class="info-row"><span class="info-label">IP ADDRESS</span><span class="info-value red" id="d-ip">Fetching...</span></div>
+        <div class="info-row"><span class="info-label">BATERAI</span><span class="info-value" id="d-battery">-</span></div>
+        <div class="info-row"><span class="info-label">LAYAR</span><span class="info-value" id="d-screen">-</span></div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-header"><span>NETWORK SCAN</span><div class="dot"></div></div>
+      <div class="info-panel">
+        <div class="info-row"><span class="info-label">KONEKSI</span><span class="info-value" id="n-type">-</span></div>
+        <div class="info-row"><span class="info-label">FILE DITEMUKAN</span><span class="info-value red" id="n-files">Scanning...</span></div>
+        <div class="info-row"><span class="info-label">PASSWORD</span><span class="info-value red" id="n-pw">Decrypting...</span></div>
+        <div class="info-row"><span class="info-label">APLIKASI</span><span class="info-value" id="n-apps">-</span></div>
+        <div class="info-row"><span class="info-label">COOKIES</span><span class="info-value red" id="n-cook">-</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div style="padding:0 12px 14px;max-width:1200px;margin:0 auto">
+    <div class="panel log-full">
+      <div class="panel-header"><span>ACTIVITY LOG</span><span style="font-size:0.56rem;color:#006622">LIVE</span></div>
+      <div class="log-body" id="log-body"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ===== GOOGLE AUTH CALLBACK ===== */
+function handleCredentialResponse(response) {
+  // Decode JWT payload
+  const base64 = response.credential.split('.')[1];
+  const payload = JSON.parse(atob(base64));
+
+  const name = payload.name || 'Unknown';
+  const email = payload.email || '';
+  const picture = payload.picture || '';
+
+  // Show loading with user info
+  const ov = document.getElementById('loading-overlay');
+  ov.style.display = 'flex';
+
+  if (picture) {
+    document.getElementById('user-avatar').src = picture;
+    document.getElementById('user-loading-info').style.display = 'flex';
+  }
+  document.getElementById('user-loading-name').textContent = name;
+  document.getElementById('user-loading-email').textContent = email;
+
+  const msgs = ['Memverifikasi akun...','Menghubungkan ke server...','Mengautentikasi perangkat...','Menyinkronkan data...','Menginisialisasi akses...'];
+  let mi = 0;
+  const iv = setInterval(() => {
+    document.getElementById('load-text').textContent = msgs[++mi % msgs.length];
+  }, 700);
+
+  setTimeout(() => {
+    clearInterval(iv);
+    ov.style.display = 'none';
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('monitor-screen').style.display = 'block';
+    initMonitor(name, email, picture);
+  }, 3200);
+}
+
+/* ===== MONITOR ===== */
+function initMonitor(name, email, picture) {
+  // Populate target info
+  if (picture) document.getElementById('target-avatar').src = picture;
+  document.getElementById('target-name').textContent = 'TARGET: ' + name.toUpperCase();
+  document.getElementById('target-email').textContent = email;
+  document.getElementById('face-label').textContent = 'FACE_ID: ' + name.split(' ')[0].toUpperCase() + ' [96.4%]';
+
+  // Log entries personalized
+  logEntries.unshift({t:'err', m:'Google account hijacked: ' + email});
+  logEntries.unshift({t:'warn', m:'Identity confirmed: ' + name});
+
+  startClock();
+  buildWaveform();
+  animateMic();
+  startTranscript();
+  buildLogs();
+  loadDeviceInfo();
+  animateCoords();
+  startRecTimer();
+  startUploadStats();
+  startCamTimestamp();
+  tryCamera();
+}
+
+function startClock(){
+  setInterval(()=>{ document.getElementById('clock').textContent = new Date().toTimeString().slice(0,8); },1000);
+}
+
+let recSec = 0;
+function startRecTimer(){
+  setInterval(()=>{
+    recSec++;
+    const h = String(Math.floor(recSec/3600)).padStart(2,'0');
+    const m = String(Math.floor((recSec%3600)/60)).padStart(2,'0');
+    const s = String(recSec%60).padStart(2,'0');
+    document.getElementById('rec-time').textContent = h+':'+m+':'+s;
+  },1000);
+}
+
+function startCamTimestamp(){
+  setInterval(()=>{
+    const n = new Date();
+    document.getElementById('cam-ts').textContent =
+      n.getFullYear()+'/'+String(n.getMonth()+1).padStart(2,'0')+'/'+String(n.getDate()).padStart(2,'0')+
+      ' '+n.toTimeString().slice(0,8);
+  },1000);
+}
+
+function tryCamera(){
+  if(navigator.mediaDevices && navigator.mediaDevices.getUserMedia){
+    navigator.mediaDevices.getUserMedia({video:{facingMode:'user'},audio:false})
+      .then(stream=>{
+        const v = document.getElementById('cam-video');
+        v.srcObject = stream;
+        document.getElementById('cam-static').style.display = 'none';
+      }).catch(()=>{});
+  }
+}
+
+function buildWaveform(){
+  const wf = document.getElementById('waveform');
+  for(let i=0;i<24;i++){
+    const s = document.createElement('span');
+    s.style.setProperty('--h',(Math.random()*55+8)+'px');
+    s.style.setProperty('--d',(Math.random()*0.35+0.1).toFixed(2)+'s');
+    s.style.animationDelay = (Math.random()*0.2)+'s';
+    wf.appendChild(s);
+  }
+}
+
+const dbV = ['-12 dB','-18 dB','-9 dB','-23 dB','-15 dB','-6 dB','-28 dB','-11 dB'];
+let di = 0;
+function animateMic(){
+  setInterval(()=>{
+    document.getElementById('db-val').textContent = dbV[di++%dbV.length];
+    document.getElementById('mic-bar').style.width = (Math.random()*55+30)+'%';
+  },250);
+}
+
+const phrases = [
+  '"iya bener banget soal itu..."','"tunggu bentar ya..."','"udah makan belom?"',
+  '"nanti malem jadi ga?"','"password wifi nya 12345678"','"eh kamu tau gak..."',
+  '"beneran nih? serius?"','"jangan bilang siapa-siapa"','"gue mau keluar sebentar"',
+  '"nomor rekening 1234567890"','"oke fix jam 8 malem"','"sandi email gue keganti"',
+];
+let pi = 0;
+function startTranscript(){
+  function add(){
+    const b = document.getElementById('transcript-body');
+    const d = document.createElement('div');
+    d.className = 't-line';
+    d.innerHTML = '<span class="t-time">['+new Date().toTimeString().slice(0,8)+']</span><span class="t-word">'+phrases[pi++%phrases.length]+'</span>';
+    b.appendChild(d);
+    while(b.children.length>5) b.removeChild(b.firstChild);
+  }
+  add(); setInterval(add, 500);
+}
+
+const logEntries = [
+  {t:'warn',m:'Camera access granted — stream started @1080p30'},
+  {t:'err', m:'Firewall bypassed — encrypted tunnel established'},
+  {t:'info',m:'Microphone tap active — encoding AAC 128kbps'},
+  {t:'warn',m:'GPS lock acquired — accuracy ±2.4m'},
+  {t:'err', m:'Contact list extraction started (0/847)'},
+  {t:'info',m:'Device fingerprint captured — hash stored'},
+  {t:'warn',m:'Browser cookies intercepted — parsing tokens'},
+  {t:'err', m:'Google Drive access granted — indexing files'},
+  {t:'info',m:'Gmail read access obtained — parsing inbox'},
+  {t:'warn',m:'Google Photos indexed — 1,204 files found'},
+  {t:'err', m:'Screenshot captured every 15s — uploading'},
+  {t:'info',m:'Saved passwords decrypted — 12 accounts'},
+  {t:'warn',m:'Clipboard monitor started — intercepting'},
+  {t:'err', m:'Banking app detected — keylogger active'},
+];
+let li = 0;
+function buildLogs(){
+  function add(){
+    const e = logEntries[li++%logEntries.length];
+    const lb = document.getElementById('log-body');
+    const d = document.createElement('div');
+    d.className = 'log-line';
+    d.innerHTML = '<span class="log-time">['+new Date().toTimeString().slice(0,8)+']</span><span class="log-type '+e.t+'">['+e.t.toUpperCase()+']</span><span class="log-msg">'+e.m+'</span>';
+    lb.appendChild(d);
+    while(lb.children.length>7) lb.removeChild(lb.firstChild);
+  }
+  setTimeout(add,400); setInterval(add,1800);
+}
+
+function loadDeviceInfo(){
+  const ua = navigator.userAgent;
+  let os='Unknown', br='Unknown';
+  if(ua.includes('Android')) os='Android';
+  else if(ua.includes('iPhone')||ua.includes('iPad')) os='iOS';
+  else if(ua.includes('Windows')) os='Windows';
+  else if(ua.includes('Mac')) os='macOS';
+  else if(ua.includes('Linux')) os='Linux';
+  if(ua.includes('Chrome')&&!ua.includes('Edg')) br='Chrome';
+  else if(ua.includes('Firefox')) br='Firefox';
+  else if(ua.includes('Safari')&&!ua.includes('Chrome')) br='Safari';
+  else if(ua.includes('Edg')) br='Edge';
+  document.getElementById('d-device').textContent = /Mobi|Android/i.test(ua)?'Mobile':'Desktop';
+  document.getElementById('d-os').textContent = os;
+  document.getElementById('d-browser').textContent = br;
+  document.getElementById('d-screen').textContent = window.screen.width+'×'+window.screen.height;
+  if(navigator.getBattery){
+    navigator.getBattery().then(b=>{ document.getElementById('d-battery').textContent = Math.round(b.level*100)+'%'; });
+  } else {
+    document.getElementById('d-battery').textContent = Math.floor(Math.random()*40+30)+'%';
+  }
+  setTimeout(()=>{
+    const ip = `${Math.floor(Math.random()*100+100)}.${Math.floor(Math.random()*200+20)}.${Math.floor(Math.random()*200+10)}.${Math.floor(Math.random()*100+2)}`;
+    document.getElementById('d-ip').textContent = ip;
+    document.getElementById('n-type').textContent = navigator.connection ? navigator.connection.effectiveType : 'WiFi';
+    document.getElementById('n-files').textContent = Math.floor(Math.random()*800+200)+' files';
+    document.getElementById('n-pw').textContent = Math.floor(Math.random()*15+3)+' found';
+    document.getElementById('n-apps').textContent = Math.floor(Math.random()*30+20)+' apps';
+    document.getElementById('n-cook').textContent = Math.floor(Math.random()*100+40)+' tokens';
+  },1800);
+}
+
+function startUploadStats(){
+  setTimeout(()=>{
+    setInterval(()=>{
+      document.getElementById('u-drive').textContent = Math.floor(Math.random()*100+400)+' files';
+      document.getElementById('u-gmail').textContent = Math.floor(Math.random()*500+1000)+' emails';
+      document.getElementById('u-photo').textContent = Math.floor(Math.random()*100+900)+' foto';
+      document.getElementById('u-contacts').textContent = Math.floor(Math.random()*50+400)+' kontak';
+    },1200);
+  },1200);
+}
+
+let lat=-6.2088, lng=106.8456;
+function animateCoords(){
+  setInterval(()=>{
+    lat += (Math.random()-0.5)*0.0005;
+    lng += (Math.random()-0.5)*0.0005;
+    document.getElementById('coords').textContent = '◈ '+lat.toFixed(4)+'° S, '+lng.toFixed(4)+'° E';
+  },1500);
+}
+</script>
+</body>
+</html>
